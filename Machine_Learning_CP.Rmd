@@ -1,0 +1,167 @@
+---
+title: "Practical Machine Learning"
+author: "Daniel Marinescu"
+date: "May 24, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### 1. BACKGROUND AND OBJECTIVE
+##### Today, devices like Jawbone Up, Nike FuelBand and Fitbit collect data about personal activity. This data includes measurements related to how much of a particular activity is done. 
+
+##### The objective of this project is to utilize data measured from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to predict the manner in which they performed the exercise, i.e the 'classe' variable. A training data set is used for model building, and applied onto the test data.
+
+### 2. GETTING THE DATA
+
+##### Load relevant libraries 
+
+```{r echo=TRUE}
+
+library(caret)
+library(ggplot2)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(knitr)
+library(rattle)
+
+```
+
+##### We download the data from their corresponding links, while ensuring to recode invalid values or strings to NA.
+
+```{r echo=TRUE}
+
+if(!file.exists("./CP")){dir.create("./CP")}
+
+training <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", na.strings=c("NA","#DIV/0!",""))
+
+test <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",na.strings=c("NA","#DIV/0!",""))
+
+```
+
+### 3. CLEANING AND PARTITIONING THE DATA
+
+##### First let's identify columns which have predomidantly NA values (as defined as 60% or more NA)
+
+```{r echo=TRUE}
+
+###### Set initial vectors 
+drop_index <- vector()
+j=1
+
+###### Create the vector (drop_index) of columns numbers with high rates of NA
+for(i in 2:length(training)){
+    if(sum(is.na(training[,i]))/nrow(training) >=0.6){
+        drop_index[j] <- i
+        j <- j+1
+    }
+}
+
+```
+
+##### We now exclude all unecessary columns which have been identified above, as well as the firt column which has the observation numbers.
+
+```{r echo=TRUE}
+
+training_sub <- training[,-c(1,drop_index)]
+
+```
+
+##### Partioning training set into mytrain and mytest sets:
+
+```{r echo=TRUE}
+
+intrain <- createDataPartition(training_sub$classe, p=0.6, list=FALSE)
+
+mytrain <- training_sub[intrain,]
+mytest <- training_sub[-intrain,]
+dim(mytrain)
+dim(mytest)
+
+```
+
+### 4. MODEL 1 - CLASSIFICATION TREE
+##### We run a classfication tree
+
+```{r echo=TRUE}
+
+set.seed(4812)
+
+modfit1 <- rpart(classe ~ ., data=training_sub, method="class")
+
+fancyRpartPlot(modfit1)
+
+```
+
+##### Predict on mytest set and look at corresponding confusion matrix to observe performance of decision tree
+
+```{r echo=TRUE}
+
+prediction1 <- predict(modfit1, mytest, type = "class")
+
+confusionMatrix(prediction1, mytest$classe)
+
+```
+
+##### We see an observe an accuracy of 0.8689
+
+### 5. MODEL 2 - RANDOM FOREST MODEL
+##### We run a random forest model
+
+```{r echo=TRUE}
+
+set.seed(4812)
+
+modfit2 <- randomForest(classe ~ ., data=training_sub)
+
+```
+
+##### Predict on mytest set and look at corresponding confusion matrix to observe performance of random forest model
+
+```{r echo=TRUE}
+
+prediction2 <- predict(modfit2, mytest, type = "class")
+
+confusionMatrix(prediction2, mytest$classe)
+
+```
+
+##### We see an observe an accuracy of nearly 1
+
+### 6. PREDICTING TESTING SET (ASSIGNMENT OBJECTIVE)
+
+##### Before running the predictions on our assignment test set, we will prepare the assignment testing set by (a) reducing the number of variables to the that of the training set, and (b) standardizing the factor variables to the same levels between both training set and testing set.
+
+##### a) Transform the assignment testing set into the same number of variables as training
+
+```{r echo=TRUE}
+
+test_sub <- test[,-c(1,drop_index)]
+
+```
+
+##### b) Standardize the levels of the testing set to that of the training set
+
+```{r echo=TRUE}
+
+for(k in 1:length(test_sub)){
+    if(class(test_sub[,k])=="factor"){
+       levels(test_sub[,k]) <- levels(training_sub[,k])
+    }
+}
+
+```
+
+##### We now perform the prediction on the assignment testing set. Since the random forest model performed best according to accuracy, we apply this model to our testing set for the assignment prediction
+
+```{r echo=TRUE}
+
+predictionA <- predict(modfit2, test_sub, type = "class")
+
+predictionA
+
+```
